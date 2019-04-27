@@ -1,0 +1,213 @@
+```{r}
+library(tidyverse)
+library(readxl)
+library(leaflet)
+
+data <- read_xlsx("coralData.xlsx")
+```
+
+```{r}
+data %>% glimpse()
+data <- data %>% select(c(Reef, Country, Longitude, Latitude, Date, Depth, `Water Temperature`, 
+                          # 17:28 ))
+                          24:28 ))
+
+colnames(data) <- c("reef", "country", "longitude", "latitude", "date",
+                    "depth", "water_temparature", 
+                    # "branching", "boulder", "plate", 
+                    # "soft", "avg_lightest", "avg_darkest", "avg_overall", 
+                    "coral_type", 
+                    "lightest_letter", "lightest_number", "darkest_letter", "darkest_number")
+```
+
+```{r}
+#Reef is kinda bad, but cannot do anything
+data %>% distinct(reef)
+```
+
+
+```{r}
+# Cleaning up country
+data %>% .$country %>% table() %>% as_data_frame()
+
+# BrITISH VIRGIN ISLANDS
+# BRITISH VIRGIN ISLANDS
+# British Virigin Islands
+# BVI
+data$country[data$country == "BrITISH VIRGIN ISLANDS"] <- "British Virigin Islands"
+data$country[data$country == "BRITISH VIRGIN ISLANDS"] <- "British Virigin Islands"
+data$country[data$country == "BVI"] <- "British Virigin Islands"
+data$country[data$country == "British Virigin Islands"] <- "British Virgin Islands"
+
+# Brunei Darussalam
+# Brunei
+data$country[data$country == "Brunei Darussalam"] <- "Brunei"
+
+
+# honduras
+# Honduras
+data$country[data$country == "honduras"] <- "Honduras"
+
+
+# Hong Kong SAR
+# Hong Kong	
+data$country[data$country == "Hong Kong SAR"] <- "Hong Kong"
+
+# Indo
+# Indonesia
+data$country[data$country == "Indo"] <- "Indonesia"
+
+
+# Iran				
+# Iran (islamic Republic Of)
+data$country[data$country == "Iran (islamic Republic Of)"] <- "Iran"
+
+
+# Korea, Republic Of
+# Korea, South
+data$country[data$country == "Korea, Republic Of"] <- "South Korea"
+data$country[data$country == "Korea, South"] <- "South Korea"
+
+
+# Virgin Islands (british)
+# Virgin Islands (u.s.)
+# Virgin Islands, British
+data$country[data$country == "Virgin Islands, British"] <- "Virgin Islands"
+data$country[data$country == "Virgin Islands (u.s.)"] <- "Virgin Islands"
+data$country[data$country == "Virgin Islands (british)"] <- "Virgin Islands"
+
+
+# Micronesia
+# Micronesia, Federated States
+data$country[data$country == "Micronesia, Federated States"] <- "Micronesia"
+
+
+# Netherlands Antilles
+# Netherlands Ant Illes
+data$country[data$country == "Netherlands Ant Illes"] <- "Netherlands Antilles"
+
+
+
+# Ph
+# Philippines
+# Phillipines
+data$country[data$country == "Ph"] <- "Philippines"
+data$country[data$country == "Philippines"] <- "Philippines"
+data$country[data$country == "Phillipines"] <- "Philippines"
+
+
+# Salomon Island
+# Solomon Islands
+data$country[data$country == "Salomon Island"] <- "Solomon Islands"
+
+
+# Tanzania
+# Tanzania, United Republic Of
+data$country[data$country == "Tanzania, United Republic Of"] <- "Tanzania"
+
+
+# United States
+# United States of America
+data$country[data$country == "United States"] <- "United States of America"
+
+
+# Utila
+# Honduras
+data$country[data$country == "Utila"] <- "Honduras"
+data$country <- as.factor(data$country)
+```
+
+```{r}
+data %>% glimpse()
+# NA in latitude. Rows dropped
+data <- data[!is.na(data$latitude), ]
+# NA in longitude. Rows dropped
+data <- data[!is.na(data$longitude), ]
+```
+
+```{r}
+data %>% glimpse()
+data$date <- as.Date(data$date)
+
+```
+
+```{r}
+# drop depth over 140
+data <- data[!(!is.na(data$depth) & data$depth > 140), ]
+```
+
+
+```{r}
+# Temps above 45 degree are assumed to be Fahrenheit and converted to Celcius
+data$water_temparature[(!is.na(data$water_temparature) & data$water_temparature > 45)] <- (data$water_temparature[(!is.na(data$water_temparature) & data$water_temparature > 45)] - 32) * 5 / 9
+
+# Drop the rest
+data <- data[!(!is.na(data$water_temparature) & data$water_temparature > 45), ] 
+
+data$water_temparature[!is.na(data$water_temparature)] %>% range()
+```
+
+```{r}
+data$coral_type <- data$coral_type %>% toupper()
+
+
+data$coral_type[data$coral_type == "BOULDER CORALS"] <- "BOULDER"
+
+data$coral_type <- gsub(".*BOULDER*", "Boulder", data$coral_type) 
+data$coral_type <- gsub(".*BRANCHING*", "Branching", data$coral_type) 
+data$coral_type <- gsub(".*PLATE*", "Plate", data$coral_type) 
+data$coral_type <- gsub(".*SOFT*", "Soft", data$coral_type) 
+
+data$coral_type[!data$coral_type %in% c("Boulder", "Branching", "Plate","Soft")] <- "Others"
+data %>% group_by(coral_type) %>% count() %>% arrange(desc(n))
+```
+
+
+```{r}
+# Create month and year
+data$year <- as.factor(format(data$date , "%Y"))
+data$month <- as.factor(format(data$date , "%m"))
+data$month_year <- as.factor(paste0(format(data$date , "%Y-%m"), "-01"))
+data$month_year2 <- as.factor(format(data$date , "%Y-%m"))
+```
+
+```{r}
+data_thai <- data %>% filter(country == "Thailand")
+data_thai %>% distinct(latitude)
+```
+
+
+```{r}
+data_tao <- data_thai %>% filter(longitude > 99.4 & longitude < 100)
+
+
+data_tao$reef <- gsub(", Koh Tao", "", data_tao$reef, ignore.case = TRUE) 
+data_tao$reef <- gsub("Koh Tao", "", data_tao$reef, ignore.case = TRUE) 
+data_tao$reef <- data_tao$reef %>% toupper()
+
+
+
+data_tao$reef[data_tao$reef == " - SUAN OLAN ARTIFICIAL REEF"] <- "SUAN OLAN ARTIFICIAL REEF"
+data_tao$reef[data_tao$reef == "AO LEUK"] <- "AOW LEUK"
+# data_tao$reef[data_tao$reef == "AO LEUK NORTH / HIN NGAM"] <- "AOW LEUK NORTH / HIN NGAM"
+# data_tao$reef[data_tao$reef == "AOW LEUK NORTH / HIN NGAM"] <- "AOW LEUK NORTH, HIN NGAM"
+# data_tao$reef[data_tao$reef == "AOW LEUK NORTH, HIN NGAM"] <- "AOW LEWK NORTH, HIN NGAM"
+data_tao$reef[data_tao$reef == "AO LEUK NORTH / HIN NGAM"] <- "AOW LEWK NORTH, HIN NGAM"
+data_tao$reef[data_tao$reef == "GREEN ROCK "] <- "GREEN ROCK"
+data_tao$reef[data_tao$reef == "HIN FAI SITE"] <- "HIN FAI"
+data_tao$reef[data_tao$reef == "MAI HAAD"] <- "MAE HAAD"
+data_tao$reef[data_tao$reef == "SUAN OLAN"] <- "SUAN OLAN ARTIFICIAL REEF"
+data_tao$reef[data_tao$reef == "TAA CHAA SITE"] <- "TAA CHAA"
+data_tao$reef[data_tao$reef == "TWINS PEAK"] <- "TWIN PEAKS"
+data_tao$reef[data_tao$reef == "AOW LEUK"] <- "AOW LEWK"
+
+
+data_tao$reef <- gsub("(?<=\\b)([a-z])", "\\U\\1", tolower(data_tao$reef), perl = TRUE)
+
+data_tao %>% distinct(reef)
+data_tao <- data_tao %>% select(reef, longitude, latitude, month, year, month_year, month_year2,
+                                coral_type, lightest_letter, lightest_number,
+                                darkest_letter, darkest_number)
+
+write_csv(data_tao, path = "tao.csv")
+```
